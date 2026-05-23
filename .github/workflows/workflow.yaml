@@ -13,7 +13,7 @@ permissions:
 env:
   AWS_REGION: us-east-1
   AWS_ROLE_ARN: arn:aws:iam::987020212710:oidc-provider/token.actions.githubusercontent.com # Substitua pelo ARN da sua Role
-  ECR_REPOSITORY: meu-app-vendas
+  ECR_REPOSITORY: teste-cloud-compunting
 
 jobs:
   deploy:
