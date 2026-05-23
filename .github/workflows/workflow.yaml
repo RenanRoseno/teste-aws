@@ -1,1 +1,54 @@
-aa
+name: Deploy to Amazon ECR (OIDC)
+
+on:
+  push:
+    branches:
+      - main
+
+# IMPORTANTE: Necessário para o OIDC solicitar o token JWT da AWS
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::123456789012:role/NOME_DA_SUA_ROLE # Substitua pelo ARN da sua Role
+  ECR_REPOSITORY: meu-app-vendas
+
+jobs:
+  deploy:
+    name: Build e Push
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout do código
+      uses: actions/checkout@v4
+
+    # Passo 1: Autenticar na AWS usando a IAM Role (Sem chaves fixas!)
+    - name: Configurar credenciais da AWS via OIDC
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ env.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+        audience: sts.amazonaws.com
+
+    # Passo 2: Fazer login no Amazon ECR
+    - name: Login no Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # Passo 3: Criar o repositório no ECR caso ele ainda não exista
+    - name: Criar repositório no ECR (se não existir)
+      run: |
+        aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} || true
+
+    # Passo 4: Buildar, taggear e pushar a imagem
+    - name: Build, tag, and push image to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
+        docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+        docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
